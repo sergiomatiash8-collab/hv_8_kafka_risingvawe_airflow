@@ -3,8 +3,8 @@ services:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-    ports:
-      - "2181:2181"
+    networks:
+      - streaming_net
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -15,8 +15,13 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "tweets:3:1"
+    networks:
+      - streaming_net
 
   postgres:
     image: postgres:15
@@ -28,6 +33,23 @@ services:
       - "5454:5432"
     volumes:
       - pgdata_final:/var/lib/postgresql/data
+    networks:
+      - streaming_net
+
+  risingwave:
+    image: risingwavelabs/risingwave:latest
+    command: >
+      standalone --meta-opts "" --compute-opts "" --frontend-opts "" --compactor-opts ""
+    environment:
+      - RUST_BACKTRACE=1
+    ports:
+      - "4566:4566"
+    networks:
+      - streaming_net
+
+networks:
+  streaming_net:
+    driver: bridge
 
 volumes:
   pgdata_final:
