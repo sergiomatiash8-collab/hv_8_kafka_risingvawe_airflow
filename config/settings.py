@@ -11,3 +11,13 @@ BATCH_LIMIT = 1000
 
 # Logging format
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Налаштування Postgres (RisingWave використовує той самий протокол)
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "admin123")
+DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_PORT = int(os.getenv("DB_PORT", 5454))
+DB_NAME = os.getenv("DB_NAME", "twitter_sentiment")
+
+# Налаштування аналізатора
+SENTIMENT_THRESHOLD = 0.1
