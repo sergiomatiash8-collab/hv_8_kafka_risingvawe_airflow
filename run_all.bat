@@ -1,13 +1,13 @@
 @echo off
-echo 🚀 Запуск системи стрімінгу твітів...
+echo 🚀 Запуск системи аналізу настрою твітів...
 
 :: 1. Запускаємо Консюмера в новому вікні
-start "Consumer" cmd /k "venv\Scripts\activate && python consumer_main.py"
+start "Consumer_Service" cmd /k "venv\Scripts\activate && python consumer_main.py"
 
-:: 2. Чекаємо 3 секунди, щоб база та клієнт встигли ініціалізуватися
-timeout /t 3
+:: 2. Чекаємо 5 секунд, щоб Консюмер встиг підключитися до Kafka та Postgres
+timeout /t 5
 
 :: 3. Запускаємо Продюсера в новому вікні
-start "Producer" cmd /k "venv\Scripts\activate && python producer_main.py"
+start "Producer_Service" cmd /k "venv\Scripts\activate && python producer_main.py"
 
-echo ✅ Обидва сервіси запущені!
+echo ✅ Обидва сервіси запущені. Дивись у нові вікна!
