@@ -1,5 +1,5 @@
 from datetime import datetime
-from src.domain.models import Tweet
+from src.domain.producer_models import Tweet
 
 def transform_row_to_tweet(row: dict) -> Tweet:
     """

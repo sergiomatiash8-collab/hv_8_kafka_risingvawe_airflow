@@ -1,30 +1,31 @@
 import pytest
+from src.services.transformers import transform_row_to_tweet
+from src.domain.models import Tweet
 
-# Функція, яку ми тестуємо (потім ми її імпортуємо з твого файлу)
-def preprocess_tweet(row):
-    return {
-        "tweet_id": str(row.get("tweet_id")),
-        "author": row.get("author", "unknown").lower(),
-        "text": row.get("text", "").strip(),
-        "inbound": bool(row.get("inbound"))
+def test_transform_row_to_tweet_valid():
+    # 1. Підготовка (Given)
+    raw_data = {
+        "tweet_id": 123, 
+        "author_id": "UserABC", 
+        "text": "  Hello Kafka!  ", 
+        "inbound": 1
     }
-
-# Сам тест
-def test_preprocess_tweet_valid_data():
-    raw_data = {"tweet_id": 123, "author": "UserABC", "text": "  Hello Kafka!  ", "inbound": 1}
-    result = preprocess_tweet(raw_data)
     
-    assert result["tweet_id"] == "123"      # Перевіряємо, чи стало рядком
-    assert result["author"] == "userabc"    # Перевіряємо, чи став нижній регістр
-    assert result["text"] == "Hello Kafka!" # Перевіряємо, чи прибрались пробіли
-    assert result["inbound"] is True        # Перевіряємо перетворення в bool
-
-def test_preprocess_tweet_missing_data():
-    # Ситуація: прийшов порожній об'єкт
-    raw_data = {}
-    result = preprocess_tweet(raw_data)
+    # 2. Дія (When)
+    result = transform_row_to_tweet(raw_data)
     
-    assert result["tweet_id"] == "None"      # Перевіряємо, що не вибило помилку
-    assert result["author"] == "unknown"     # Значення за замовчуванням
-    assert result["text"] == ""              # Порожній рядок замість помилки
-    assert result["inbound"] is False        # False за замовчуванням
+    # 3. Перевірка (Then)
+    assert isinstance(result, Tweet) # Перевіряємо, що це тепер об'єкт класу
+    assert result.tweet_id == "123"
+    assert result.author == "UserABC" # У нашому новому коді ми не робили .lower()
+    assert result.text == "Hello Kafka!"
+    assert result.inbound is True
+
+def test_transform_row_to_tweet_missing_data():
+    raw_data = {} # Порожні дані
+    result = transform_row_to_tweet(raw_data)
+    
+    assert result.tweet_id == "None"
+    assert result.author == "unknown"
+    assert result.text == ""
+    assert result.inbound is False
