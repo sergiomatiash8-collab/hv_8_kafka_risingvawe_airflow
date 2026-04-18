@@ -38,7 +38,6 @@ services:
     environment:
       POSTGRES_DB: twitter_sentiment
       POSTGRES_USER: admin
-      # Замість прямого пароля використовуємо шлях до секрету
       POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
     ports:
       - "5454:5432"
@@ -71,10 +70,24 @@ services:
       - streaming_net
     restart: on-failure
 
-# Оголошення секретів
+  # --- ОСЬ ЦЕЙ НОВИЙ МІКРОКРОК ---
+  producer_app:
+    build: .
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      KAFKA_TOPIC_NAME: "tweets"
+      CSV_FILE_PATH: "/app/tweets.csv"
+      STREAMING_DELAY: 0.08
+    networks:
+      - streaming_net
+    restart: on-failure
+
 secrets:
   pg_password:
-    file: ./pg_password.txt # Створи цей файл поруч із docker-compose.yml
+    file: ./pg_password.txt
 
 networks:
   streaming_net:
