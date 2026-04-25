@@ -42,10 +42,8 @@ services:
 
   risingwave:
     image: risingwavelabs/risingwave:latest
-    command: standalone
-    depends_on:
-      - kafka
-      - postgres
+    environment:
+      - RW_STANDALONE_OPTS=--meta-opts "" --compute-opts "" --frontend-opts ""
     ports:
       - "4566:4566"
     networks:
