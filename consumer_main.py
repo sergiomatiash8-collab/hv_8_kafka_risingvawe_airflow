@@ -1,4 +1,6 @@
 import logging
+import signal
+import sys
 from config import settings
 from src.infrastructure.kafka_consumer import KafkaConsumerClient
 from src.infrastructure.db_repository import PostgresRepository
@@ -12,8 +14,23 @@ def main():
 
     logger.info("📡 Запуск Tweet Sentiment Consumer...")
 
+    # Ініціалізація змінних для доступу у finally
+    consumer_client = None
+    consumer_service = None
+
+    def handle_exit(sig, frame):
+        """Обробник сигналів для м'якої зупинки Docker контейнера"""
+        logger.info(f"📥 Отримано сигнал зупинки ({sig}). Завершуємо роботу...")
+        if consumer_service:
+            consumer_service.stop() # Вимикаємо прапорець роботи в циклі
+
+    # Реєструємо сигнали зупинки
+    signal.signal(signal.SIGINT, handle_exit)
+    signal.signal(signal.SIGTERM, handle_exit)
+
     try:
         # 2. Ініціалізуємо інфраструктуру
+        # Переконайся, що в класах прописані параметри підключення з settings
         consumer_client = KafkaConsumerClient()
         repository = PostgresRepository()
         
@@ -28,16 +45,21 @@ def main():
         )
 
         # 5. Поїхали!
+        # Цей метод має містити цикл "while self._is_running"
         consumer_service.run()
 
-    except KeyboardInterrupt:
-        logger.info("🛑 Консюмер зупинений користувачем.")
     except Exception as e:
         logger.error(f"💥 Критична помилка в консюмері: {e}")
     finally:
-        if 'consumer_client' in locals():
+        # 6. Чисте закриття ресурсів
+        if consumer_client:
             consumer_client.close()
             logger.info("🔌 З'єднання з Kafka закрито.")
+        
+        # Якщо в репозиторії є пул з'єднань, його теж варто закрити тут
+        # if repository: repository.close() 
+        
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

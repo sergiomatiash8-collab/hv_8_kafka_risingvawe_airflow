@@ -1,4 +1,7 @@
+version: '3.8'
+
 services:
+  # ======== ІНФРАСТРУКТУРА (Kafka & Postgres) ========
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
@@ -26,9 +29,9 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     networks:
       - streaming_net
@@ -65,14 +68,14 @@ services:
       - RUST_BACKTRACE=1
     ports:
       - "4566:4566"
-      - "5691:5691"
     networks:
       - streaming_net
     restart: on-failure
 
-  # --- ОСЬ ЦЕЙ НОВИЙ МІКРОКРОК ---
+  # ======== ПРИКЛАДНИЙ КОД (Твої Python скрипти) ========
   producer_app:
     build: .
+    command: python producer_main.py
     depends_on:
       kafka:
         condition: service_healthy
@@ -85,6 +88,118 @@ services:
       - streaming_net
     restart: on-failure
 
+  consumer_app:
+    build: .
+    command: python consumer_main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_DB: "twitter_sentiment"
+      POSTGRES_USER: "admin"
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets:
+      - pg_password
+    networks:
+      - streaming_net
+    restart: on-failure
+
+  metrics_exporter:
+    build: .
+    command: python src/monitoring/metrics_exporter.py
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets:
+      - pg_password
+    networks:
+      - streaming_net
+
+  # ======== МОНІТОРИНГ (Prometheus & Grafana) ========
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - streaming_net
+    depends_on:
+      - metrics_exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - streaming_net
+    depends_on:
+      - prometheus
+
+  # ======== ОРКЕСТРАЦІЯ (Airflow) ========
+  airflow_postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    networks:
+      - streaming_net
+
+  airflow_webserver:
+    image: apache/airflow:2.7.0
+    depends_on:
+      airflow_postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
+      # Згенерований Fernet Key для безпеки
+      AIRFLOW__CORE__FERNET_KEY: 'b'V0ZfX0tleV9fR2VuZXJhdGVkX19CeV9fR2VtaW5pX18='
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8080:8080"
+    command: webserver
+    networks:
+      - streaming_net
+
+  airflow_scheduler:
+    image: apache/airflow:2.7.0
+    depends_on:
+      airflow_postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: 'b'V0ZfX0tleV9fR2VuZXJhdGVkX19CeV9fR2VtaW5pX18='
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: scheduler
+    networks:
+      - streaming_net
+
 secrets:
   pg_password:
     file: ./pg_password.txt
@@ -95,3 +210,4 @@ networks:
 
 volumes:
   pgdata_final:
+  airflow_postgres_data:

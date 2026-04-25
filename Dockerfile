@@ -2,26 +2,31 @@
 FROM python:3.10-slim
 
 # 2. Системні залежності
-RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    netcat-openbsd \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
 # 3. Робоча директорія
 WORKDIR /app
 
 # 4. Встановлення бібліотек
+# Додано psycopg2-binary та prometheus-client для моніторингу
 RUN pip install --no-cache-dir \
     pandas \
     kafka-python \
-    python-dotenv
+    python-dotenv \
+    psycopg2-binary \
+    prometheus-client
 
-# 5. Копіювання файлів (враховуючи твою структуру на скріншоті)
-COPY ./src /app/src
-COPY ./config.py /app/config.py
-COPY ./producer_main.py /app/producer_main.py
-COPY ./tweets.csv /app/tweets.csv
+# 5. Копіювання всього проекту
+# Ми копіюємо корінь, щоб були доступні і producer, і consumer
+COPY . .
 
-# 6. Healthcheck
+# 6. Healthcheck (залишаємо твій комплексний варіант)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD python /app/src/monitoring/healthcheck.py || exit 1
 
-# 7. Запуск (змінено на твій реальний файл)
+# 7. Запуск за замовчуванням (можна перевизначити в docker-compose)
 CMD ["python", "producer_main.py"]
