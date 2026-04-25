@@ -3,7 +3,7 @@ import logging
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
-# Налаштування логера (це можна винести в окремий config, але для наочності тут)
+# Налаштування логера
 logger = logging.getLogger("KafkaMessagingService")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -13,7 +13,6 @@ class KafkaMessagingService:
             self.producer = KafkaProducer(
                 bootstrap_servers=bootstrap_servers,
                 value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode('utf-8'),
-                # Додаємо параметри ретраїв на рівні бібліотеки
                 retries=5,
                 retry_backoff_ms=1000 
             )
@@ -24,13 +23,12 @@ class KafkaMessagingService:
 
     def send_message(self, topic: str, message: dict):
         """
-        Відправка повідомлення з логуванням станів.
+        Відправка повідомлення з використанням універсальних callback-ів.
         """
         try:
-            # send() в kafka-python асинхронний, повертає Future
             future = self.producer.send(topic, value=message)
             
-            # Додаємо callback для підтвердження успіху або помилки
+            # Передаємо topic, але обробляємо його через *args
             future.add_callback(self._on_success, topic)
             future.add_errback(self._on_error, topic, message)
             
@@ -39,12 +37,17 @@ class KafkaMessagingService:
         except Exception as e:
             logger.error(f"❌ Непередбачувана помилка при відправці: {e}")
 
-    def _on_success(self, topic):
-        # Це DEBUG рівень, щоб не засмічувати консоль кожну секунду
-        logger.debug(f"Successfully sent message to {topic}")
+    def _on_success(self, *args, **kwargs):
+        """
+        Універсальний обробник успіху. Ігнорує порядок аргументів від бібліотеки.
+        """
+        logger.debug("✅ Повідомлення успішно доставлено в Kafka")
 
-    def _on_error(self, topic, message, exc):
-        logger.error(f"🚨 Помилка доставки в топік {topic}: {exc}. Повідомлення: {message}")
+    def _on_error(self, topic, message, exc, *args, **kwargs):
+        """
+        Універсальний обробник помилки.
+        """
+        logger.error(f"🚨 Помилка доставки в топік {topic}: {exc}")
 
     def flush(self):
         logger.info("⏳ Очищення буфера Kafka (Flush)...")
