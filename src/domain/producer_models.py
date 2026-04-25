@@ -7,8 +7,8 @@ class Tweet:
     author: str
     text: str
     inbound: bool
-    created_at: str  # Ми будемо зберігати в ISO форматі
+    created_at: str  
 
     def to_dict(self):
-        """Метод для легкого перетворення об'єкта в словник для JSON"""
+        """Method for easily converting an object into a dictionary for JSON"""
         return asdict(self)

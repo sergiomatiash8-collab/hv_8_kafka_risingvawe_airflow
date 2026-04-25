@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class TweetSentiment:
-    """Модель твіта ПІСЛЯ аналізу настрою для збереження в БД"""
+    """Tweet model AFTER sentiment analysis for storage in the database"""
     tweet_id: str
     author: str
     text: str
@@ -10,7 +10,7 @@ class TweetSentiment:
     polarity: float
 
     def to_tuple(self):
-        """Для зручного вставляння в Postgres через %s"""
+        """For easy insertion into Postgres via %s"""
         return (self.tweet_id, self.author, self.text, self.sentiment, self.polarity)
 
     def to_dict(self):

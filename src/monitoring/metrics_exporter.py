@@ -7,59 +7,64 @@ from kafka import KafkaConsumer, TopicPartition
 import psycopg2
 from config import settings
 
-# Налаштування логування
+# Logging configuration
 logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
 logger = logging.getLogger("MetricsExporter")
 
-# --- ВИЗНАЧЕННЯ МЕТРИК PROMETHUES ---
+# --- PROMETHEUS METRICS DEFINITIONS ---
 MESSAGES_PROCESSED = Counter(
     'kafka_messages_processed_total', 
-    'Загальна кількість оброблених повідомлень з Kafka'
+    'Total number of processed Kafka messages'
 )
 PROCESSING_TIME = Histogram(
     'message_processing_seconds', 
-    'Час витрачений на обробку одного повідомлення'
+    'Time spent processing a single message'
 )
 POSTGRES_RECORDS = Gauge(
     'postgres_total_records', 
-    'Загальна кількість записів у таблиці tweets'
+    'Total number of records in the system (aggregated from materialized view)'
 )
 KAFKA_LAG = Gauge(
     'kafka_consumer_lag', 
-    'Відставання (lag) консюмера в топіку Kafka',
+    'Kafka consumer lag per topic partition',
     ['topic', 'partition']
 )
 
 class MetricsCollector:
-    """Клас для періодичного збору метрик системи"""
+    """Class for periodic system metrics collection"""
     
     def __init__(self, port=8000):
         self.port = port
 
     def collect_postgres_metrics(self):
-        """Збір даних з PostgreSQL"""
+        """Collect data from RisingWave (instead of direct Postgres)"""
         conn = None
         try:
+            # Using connection parameters from settings/environment
             conn = psycopg2.connect(
-                host="postgres",
-                database="twitter_sentiment",
-                user="admin",
-                password=os.getenv("POSTGRES_PASSWORD", "admin123"),
+                host="risingwave",  # Connecting to RisingWave where the materialized view exists
+                port=4566,
+                database="dev",
+                user="root",
+                password="",
                 connect_timeout=5
             )
             with conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM tweets;")
-                count = cursor.fetchone()[0]
+                # Query: sum tweet counts from materialized view
+                cursor.execute("SELECT SUM(tweet_count) FROM tweets_per_minute;")
+                result = cursor.fetchone()[0]
+                count = int(result) if result else 0
+                
                 POSTGRES_RECORDS.set(count)
-            logger.debug(f"📊 Postgres records: {count}")
+                logger.info(f"Metric updated: total_records = {count}")
         except Exception as e:
-            logger.error(f"❌ Помилка збору метрик Postgres: {e}")
+            logger.error(f"Error collecting database metrics: {e}")
         finally:
             if conn:
                 conn.close()
 
     def collect_kafka_metrics(self):
-        """Збір даних про лаг у Kafka"""
+        """Collect Kafka consumer lag metrics"""
         consumer = None
         topic = settings.KAFKA_TOPIC_NAME
         try:
@@ -76,32 +81,32 @@ class MetricsCollector:
                     tp = TopicPartition(topic, p_id)
                     consumer.assign([tp])
                     
-                    # Отримуємо останній зміщений офсет та поточний зафіксований
                     committed = consumer.committed(tp) or 0
                     end_offset = consumer.end_offsets([tp])[tp]
                     
                     lag = end_offset - committed
                     KAFKA_LAG.labels(topic=topic, partition=p_id).set(lag)
             
-            logger.debug(f"📊 Kafka lag collected for {topic}")
+            logger.debug(f"Kafka lag collected for {topic}")
         except Exception as e:
-            logger.error(f"❌ Помилка збору метрик Kafka: {e}")
+            logger.error(f"Error collecting Kafka metrics: {e}")
         finally:
             if consumer:
                 consumer.close()
 
     def run(self):
-        """Запуск HTTP-сервера та нескінченного циклу оновлення"""
+        """Start HTTP server and collection loop"""
         try:
+            # Start Prometheus HTTP server on port 8000
             start_http_server(self.port)
-            logger.info(f"🚀 Metrics server started on port {self.port}")
+            logger.info(f"Metrics server started on port {self.port}")
             
             while True:
                 self.collect_postgres_metrics()
                 self.collect_kafka_metrics()
-                time.sleep(30) # Оновлюємо кожні 30 секунд
+                time.sleep(15)  # Reduced to 15 seconds for faster updates
         except KeyboardInterrupt:
-            logger.info("🛑 Metrics exporter зупинено.")
+            logger.info("Metrics exporter stopped.")
             sys.exit(0)
 
 if __name__ == "__main__":

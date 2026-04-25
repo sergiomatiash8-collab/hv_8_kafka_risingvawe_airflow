@@ -7,7 +7,7 @@ class TestKafkaMessagingService(unittest.TestCase):
     @patch('src.infrastructure.kafka_client.KafkaProducer')
     def setUp(self, mock_producer_class):
         """
-        mock_producer_class — це і є наш Mock, який замінив клас KafkaProducer.
+        mock_producer_class is a mocked replacement for KafkaProducer class.
         """
         self.mock_producer_class = mock_producer_class
         self.mock_producer_instance = mock_producer_class.return_value
@@ -15,9 +15,9 @@ class TestKafkaMessagingService(unittest.TestCase):
         self.service = KafkaMessagingService(self.bootstrap_servers)
 
     def test_init_connection(self):
-        """Перевіряємо, чи правильно ініціалізується продюсер."""
-        # ТУТ ПОМИЛКА БУЛА: треба звертатися до self.mock_producer_class, 
-        # а не до імпортованого типу KafkaProducer
+        """Verify that producer is initialized correctly."""
+        # Note: we must assert against self.mock_producer_class,
+        # not the real KafkaProducer import
         self.mock_producer_class.assert_called_with(
             bootstrap_servers=self.bootstrap_servers,
             value_serializer=ANY,
@@ -26,7 +26,7 @@ class TestKafkaMessagingService(unittest.TestCase):
         )
 
     def test_send_message_success(self):
-        """Перевіряємо логіку відправки повідомлення."""
+        """Verify message sending logic."""
         topic = "test_topic"
         message = {"id": 1, "text": "hello"}
         
@@ -37,8 +37,8 @@ class TestKafkaMessagingService(unittest.TestCase):
         )
 
     def test_send_message_exception_handling(self):
-        """Перевіряємо, чи не 'падає' сервіс, якщо Kafka видає помилку."""
-        # Симулюємо помилку
+        """Ensure service does not crash when Kafka fails."""
+        # Simulate Kafka failure
         self.mock_producer_instance.send.side_effect = Exception("Kafka Down")
         
         try:
@@ -47,7 +47,10 @@ class TestKafkaMessagingService(unittest.TestCase):
         except Exception:
             execution_failed = True
             
-        self.assertFalse(execution_failed, "Service should handle exception internally")
+        self.assertFalse(
+            execution_failed,
+            "Service should handle exceptions internally"
+        )
 
 if __name__ == '__main__':
     unittest.main()

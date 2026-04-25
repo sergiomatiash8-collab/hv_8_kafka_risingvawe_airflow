@@ -13,7 +13,7 @@ def check_results():
     try:
         with psycopg2.connect(**conn_params) as conn:
             with conn.cursor() as cursor:
-                # Запит на статистику
+                
                 query = """
                 SELECT sentiment, COUNT(*) 
                 FROM tweet_sentiments 
@@ -22,16 +22,19 @@ def check_results():
                 cursor.execute(query)
                 results = cursor.fetchall()
 
-                print("\n📊 СТАТИСТИКА АНАЛІЗУ НАСТРОЮ:")
+                print("\nSENTIMENT ANALYSIS STATISTICS:")
                 print("-" * 30)
+
                 if not results:
-                    print("Таблиця порожня. Спробуй запустити продюсера!")
+                    print("Table is empty. Try running the producer!")
+
                 for sentiment, count in results:
-                    print(f"{sentiment.capitalize():<10} | {count} твітів")
+                    print(f"{sentiment.capitalize():<10} | {count} tweets")
+
                 print("-" * 30)
 
     except Exception as e:
-        print(f"❌ Не вдалося підключитися до бази: {e}")
+        print(f"Failed to connect to database: {e}")
 
 if __name__ == "__main__":
     check_results()

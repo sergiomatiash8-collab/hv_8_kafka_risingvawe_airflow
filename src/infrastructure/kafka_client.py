@@ -3,7 +3,7 @@ import logging
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
-# Налаштування логера
+# Logger configuration
 logger = logging.getLogger("KafkaMessagingService")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -16,43 +16,43 @@ class KafkaMessagingService:
                 retries=5,
                 retry_backoff_ms=1000 
             )
-            logger.info(f"✅ Підключено до Kafka: {bootstrap_servers}")
+            logger.info(f"Connected to Kafka: {bootstrap_servers}")
         except Exception as e:
-            logger.error(f"🚨 Критична помилка ініціалізації Kafka: {e}")
+            logger.error(f"Critical Kafka initialization error: {e}")
             raise
 
     def send_message(self, topic: str, message: dict):
         """
-        Відправка повідомлення з використанням універсальних callback-ів.
+        Send message using universal callbacks.
         """
         try:
             future = self.producer.send(topic, value=message)
             
-            # Передаємо topic, але обробляємо його через *args
+            # Pass topic, handled via *args in callback
             future.add_callback(self._on_success, topic)
             future.add_errback(self._on_error, topic, message)
             
         except KafkaError as ke:
-            logger.warning(f"⚠️ Тимчасова помилка Kafka (Recovery state): {ke}")
+            logger.warning(f"Temporary Kafka error (Recovery state): {ke}")
         except Exception as e:
-            logger.error(f"❌ Непередбачувана помилка при відправці: {e}")
+            logger.error(f"Unexpected error during send: {e}")
 
     def _on_success(self, *args, **kwargs):
         """
-        Універсальний обробник успіху. Ігнорує порядок аргументів від бібліотеки.
+        Universal success handler. Ignores argument order from library.
         """
-        logger.debug("✅ Повідомлення успішно доставлено в Kafka")
+        logger.debug("Message successfully delivered to Kafka")
 
     def _on_error(self, topic, message, exc, *args, **kwargs):
         """
-        Універсальний обробник помилки.
+        Universal error handler.
         """
-        logger.error(f"🚨 Помилка доставки в топік {topic}: {exc}")
+        logger.error(f"Delivery error to topic {topic}: {exc}")
 
     def flush(self):
-        logger.info("⏳ Очищення буфера Kafka (Flush)...")
+        logger.info("Flushing Kafka buffer...")
         self.producer.flush()
 
     def close(self):
-        logger.info("🔌 Закриття з'єднання з Kafka.")
+        logger.info("Closing Kafka connection.")
         self.producer.close()

@@ -8,57 +8,55 @@ from src.services.analyzer import SentimentAnalyzer
 from src.services.consumer_service import TweetConsumerService
 
 def main():
-    # 1. Налаштовуємо логування
+    # Configure logging
     logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
     logger = logging.getLogger(__name__)
 
-    logger.info("📡 Запуск Tweet Sentiment Consumer...")
+    logger.info("Starting Tweet Sentiment Consumer...")
 
-    # Ініціалізація змінних для доступу у finally
+    # Initialize variables for safe cleanup in finally block
     consumer_client = None
     consumer_service = None
 
     def handle_exit(sig, frame):
-        """Обробник сигналів для м'якої зупинки Docker контейнера"""
-        logger.info(f"📥 Отримано сигнал зупинки ({sig}). Завершуємо роботу...")
+        """Signal handler for graceful Docker shutdown"""
+        logger.info(f"Received shutdown signal ({sig}). Stopping service...")
         if consumer_service:
-            consumer_service.stop() # Вимикаємо прапорець роботи в циклі
+            consumer_service.stop()  # Stop main processing loop
 
-    # Реєструємо сигнали зупинки
+    # Register shutdown signals
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
 
     try:
-        # 2. Ініціалізуємо інфраструктуру
-        # Переконайся, що в класах прописані параметри підключення з settings
+        # Initialize infrastructure layer
         consumer_client = KafkaConsumerClient()
         repository = PostgresRepository()
-        
-        # 3. Ініціалізуємо логіку (Аналізатор)
+
+        # Initialize business logic layer
         analyzer = SentimentAnalyzer()
 
-        # 4. Збираємо сервіс (Dependency Injection)
+        # Dependency injection setup
         consumer_service = TweetConsumerService(
             consumer_client=consumer_client,
             repository=repository,
             analyzer=analyzer
         )
 
-        # 5. Поїхали!
-        # Цей метод має містити цикл "while self._is_running"
+        # Start processing loop
         consumer_service.run()
 
     except Exception as e:
-        logger.error(f"💥 Критична помилка в консюмері: {e}")
+        logger.error(f"Critical consumer error: {e}")
     finally:
-        # 6. Чисте закриття ресурсів
+        # Graceful resource cleanup
         if consumer_client:
             consumer_client.close()
-            logger.info("🔌 З'єднання з Kafka закрито.")
-        
-        # Якщо в репозиторії є пул з'єднань, його теж варто закрити тут
-        # if repository: repository.close() 
-        
+            logger.info("Kafka connection closed.")
+
+        # If repository has connection pool, close it here
+        # if repository: repository.close()
+
         sys.exit(0)
 
 if __name__ == "__main__":

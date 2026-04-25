@@ -4,7 +4,7 @@ from src.domain.consumer_models import TweetSentiment
 
 class PostgresRepository:
     def __init__(self):
-        """Ініціалізуємо налаштування підключення"""
+        """Initializing connection settings"""
         self.connection_params = {
             "user": settings.DB_USER,
             "password": settings.DB_PASSWORD,
@@ -14,7 +14,7 @@ class PostgresRepository:
         }
 
     def create_table(self):
-        """Створюємо таблицю, якщо її ще немає"""
+        """Create a table if it doesn't already exist"""
         query = """
         CREATE TABLE IF NOT EXISTS tweet_sentiments (
             tweet_id TEXT PRIMARY KEY,
@@ -30,7 +30,7 @@ class PostgresRepository:
                 conn.commit()
 
     def save_sentiment(self, tweet_sentiment: TweetSentiment):
-        """Зберігаємо об'єкт TweetSentiment в базу"""
+        """Saving the TweetSentiment object to the database"""
         query = """
             INSERT INTO tweet_sentiments (tweet_id, author, text, sentiment, polarity)
             VALUES (%s, %s, %s, %s, %s)

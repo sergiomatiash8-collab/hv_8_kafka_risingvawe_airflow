@@ -12,7 +12,7 @@ class TweetStreamingService:
         self._is_running = True
 
     def start_streaming(self):
-        logger.info(f"🚀 Починаємо стрімінг із файлу: {settings.CSV_FILE_PATH}")
+        logger.info(f"Starting streaming from file: {settings.CSV_FILE_PATH}")
         
         try:
             with open(settings.CSV_FILE_PATH, mode='r', encoding='utf-8') as f:
@@ -23,47 +23,47 @@ class TweetStreamingService:
                     if not self._is_running:
                         break
 
-                    # 1. Трансформація з обробкою None
+                    
                     tweet_obj = transform_row_to_tweet(row)
                     if not tweet_obj:
-                        logger.warning(f"⚠️ Пропущено рядок через помилку трансформації.")
+                        logger.warning("Skipped row due to transformation error.")
                         continue
 
-                    # 2. Відправка
+                    
                     try:
                         self.messaging_service.send_message(
                             topic=settings.KAFKA_TOPIC_NAME,
                             message=tweet_obj.to_dict()
                         )
                     except Exception as e:
-                        # Recovery state: якщо не вдалося відправити, пробуємо наступний
-                        logger.error(f"❌ Помилка відправки твіта {tweet_obj.tweet_id}: {e}")
+                        
+                        logger.error(f"Error sending tweet {tweet_obj.tweet_id}: {e}")
                         continue
                     
                     count += 1
                     if count % 100 == 0:
-                        logger.info(f"📊 Прогрес: відправлено {count} повідомлень...")
+                        logger.info(f"Progress: {count} messages sent...")
 
-                    # 3. Контроль швидкості (Rate Limiting)
+                    
                     time.sleep(settings.STREAMING_DELAY)
 
-                    # Обмеження для тестів (Batch Limit)
+                    
                     if settings.BATCH_LIMIT and count >= settings.BATCH_LIMIT:
                         break
 
         except FileNotFoundError:
-            logger.error(f"🚨 Файл не знайдено за шляхом: {settings.CSV_FILE_PATH}")
+            logger.error(f"File not found at path: {settings.CSV_FILE_PATH}")
         except Exception as e:
-            logger.critical(f"💥 Критична помилка стрімінгу: {e}")
+            logger.critical(f"Critical streaming error: {e}")
         finally:
             self._shutdown(count)
 
     def _shutdown(self, final_count):
-        logger.info("⏳ Завершення роботи: очищення буферів...")
+        logger.info("Shutting down: flushing buffers...")
         self.messaging_service.flush()
         self.messaging_service.close()
-        logger.info(f"🏁 Стрімінг завершено. Всього успішно оброблено: {final_count}")
+        logger.info(f"Streaming finished. Total successfully processed: {final_count}")
 
     def stop(self):
-        """Метод для м'якої зупинки (наприклад, по сигналу від Docker)"""
+        """Graceful shutdown method (e.g., triggered by Docker signal)"""
         self._is_running = False

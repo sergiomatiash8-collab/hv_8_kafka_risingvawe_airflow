@@ -93,9 +93,10 @@ services:
       - kafka
       - postgres
     environment:
+      PYTHONPATH: /app
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
       POSTGRES_HOST: "postgres"
-      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      POSTGRES_PASSWORD_FILE: "/run/secrets/pg_password"
     secrets:
       - pg_password
     networks:

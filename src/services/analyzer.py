@@ -4,21 +4,20 @@ from src.domain.consumer_models import TweetSentiment
 
 class SentimentAnalyzer:
     def __init__(self):
-        # Ми виносимо поріг чутливості в налаштування
         self.threshold = settings.SENTIMENT_THRESHOLD
 
     def analyze(self, tweet_data: dict) -> TweetSentiment:
         """
-        Приймає словник із Kafka, аналізує текст 
-        і повертає готовий об'єкт TweetSentiment.
+        Accepts a dictionary from Kafka, analyzes the text,
+        and returns a TweetSentiment object.
         """
         text = tweet_data.get("text", "")
         
-        # Використовуємо TextBlob для аналізу
+        
         blob = TextBlob(text)
         polarity = blob.sentiment.polarity
         
-        # Визначаємо категорію настрою
+        
         if polarity > self.threshold:
             sentiment = "positive"
         elif polarity < -self.threshold:
@@ -26,7 +25,7 @@ class SentimentAnalyzer:
         else:
             sentiment = "neutral"
 
-        # Створюємо об'єкт моделі, яку ми підготували раніше
+       
         return TweetSentiment(
             tweet_id=str(tweet_data.get("tweet_id")),
             author=str(tweet_data.get("author", "unknown")),
